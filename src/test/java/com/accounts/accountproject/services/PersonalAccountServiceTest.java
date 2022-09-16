@@ -1,10 +1,12 @@
 package com.accounts.accountproject.services;
 
-import com.accounts.accountproject.testclient.AccountData;
-import com.accounts.accountproject.testclient.AccountService;
-import com.accounts.accountproject.testclient.CustomerService;
 import com.accounts.accountproject.models.NewPersonalAccountDto;
 import com.accounts.accountproject.models.PersonalAccountDto;
+import com.accounts.accountproject.services.exceptions.CannotCreateAccountException;
+import com.accounts.accountproject.services.exceptions.CustomerFileNotFoundException;
+import com.accounts.accountproject.services.exceptions.WrongPersonalIdException;
+import com.accounts.accountproject.testclient.AccountData;
+import com.accounts.accountproject.testclient.AccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +25,7 @@ import static org.mockito.Mockito.verify;
 class PersonalAccountServiceTest {
 
     @Mock
-    CustomerService customerService;
+    CustomerValidatorService customerValidatorService;
 
     @Mock
     AccountService accountService;
@@ -33,35 +35,48 @@ class PersonalAccountServiceTest {
 
     @BeforeEach
     void setUp() {
-        personalAccountService = new PersonalAccountService(accountService, customerService);
+        personalAccountService = new PersonalAccountService(accountService, customerValidatorService);
     }
 
     @Test
-    void shouldThrowCustomerNotFoundExceptionWhenCustomerNotExistsInDb() {
+    void shouldThrowCannotCreateAccountExceptionWhenCatchWrongPersonalIdException() {
         //given
         NewPersonalAccountDto newPersonalAccountDto = Mockito.mock(NewPersonalAccountDto.class);
-        given(customerService.hasCustomerFile(any(), any(), any())).willReturn(false);
-
+        given(customerValidatorService.validateCustomerPersonalId(any())).willThrow(WrongPersonalIdException.class);
 
         //when and then
-        Throwable exception = assertThrows(CustomerFileNotFoundException.class,
+        Throwable exception = assertThrows(CannotCreateAccountException.class,
                 () -> personalAccountService.createAndReturnAccountNumber(newPersonalAccountDto));
 
-        //then
-        assertEquals("Provided customer does not exist in the database.", exception.getMessage());
+        assertEquals("CANNOT_CREATE_ACCOUNT", exception.getMessage());
     }
 
     @Test
-    void shouldReturnAccountNumberWhenProvidePersonalAccountDataAndCustomerExistsInDb() {
+    void shouldThrowCannotCreateAccountExceptionWhenCatchCustomerFileNotFoundException() {
+        //given
+        NewPersonalAccountDto newPersonalAccountDto = Mockito.mock(NewPersonalAccountDto.class);
+        given(customerValidatorService.hasCustomerFile(any(), any(), any())).willThrow(CustomerFileNotFoundException.class);
+
+        //when and then
+        Throwable exception = assertThrows(CannotCreateAccountException.class,
+                () -> personalAccountService.createAndReturnAccountNumber(newPersonalAccountDto));
+
+        assertEquals("CANNOT_CREATE_ACCOUNT", exception.getMessage());
+    }
+
+    @Test
+    void shouldReturnAccountNumberWhenProvidePersonalAccountDataAndCustomerPassValidation() {
         //given
         String expectedAccountNumber = "61109010140000071219812874";
         NewPersonalAccountDto newPersonalAccountDto = Mockito.mock(NewPersonalAccountDto.class);
-        given(customerService.hasCustomerFile(any(), any(), any())).willReturn(true);
+        given(customerValidatorService.hasCustomerFile(any(), any(), any())).willReturn(true);
+        given(customerValidatorService.validateCustomerPersonalId(any())).willReturn(true);
+        given(customerValidatorService.isAccountTypeUniqueForCustomer()).willReturn(true);
         given(accountService.createAndReturnAccountNumber(any(), any(), any())).willReturn(
                 expectedAccountNumber
         );
 
-        //when and then
+        //when
         String accountNumber = personalAccountService.createAndReturnAccountNumber(newPersonalAccountDto);
 
         //then
