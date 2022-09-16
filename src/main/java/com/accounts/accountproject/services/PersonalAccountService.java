@@ -2,32 +2,38 @@ package com.accounts.accountproject.services;
 
 import com.accounts.accountproject.models.NewPersonalAccountDto;
 import com.accounts.accountproject.models.PersonalAccountDto;
+import com.accounts.accountproject.services.exceptions.CannotCreateAccountException;
+import com.accounts.accountproject.services.exceptions.CustomerFileNotFoundException;
+import com.accounts.accountproject.services.exceptions.WrongPersonalIdException;
 import com.accounts.accountproject.testclient.AccountData;
 import com.accounts.accountproject.testclient.AccountService;
-import com.accounts.accountproject.testclient.CustomerService;
 import org.springframework.stereotype.Service;
 
 @Service
 public class PersonalAccountService {
 
     private final AccountService accountService;
-    private final CustomerService customerService;
+    private final CustomerValidatorService newCustomerValidatorService;
 
-    public PersonalAccountService(AccountService accountService, CustomerService customerService) {
+    public PersonalAccountService(AccountService accountService, CustomerValidatorService newCustomerValidatorService) {
         this.accountService = accountService;
-        this.customerService = customerService;
+        this.newCustomerValidatorService = newCustomerValidatorService;
     }
 
     public String createAndReturnAccountNumber(NewPersonalAccountDto newPersonalAccountDto) {
         String accountNumber;
-        boolean isNewCustomer = !customerService.hasCustomerFile(
-                newPersonalAccountDto.getPersonalId(),
-                newPersonalAccountDto.getFirstName(),
-                newPersonalAccountDto.getLastName()
-        );
 
-        if (isNewCustomer) {
-            throw new CustomerFileNotFoundException("Provided customer does not exist in the database.");
+        try {
+            /* I do not create one method for validation in newCustomerValidatorService because I thought some
+            methods can be used somewhere else alone */
+            newCustomerValidatorService.validateCustomerPersonalId(newPersonalAccountDto.getPersonalId());
+            newCustomerValidatorService.isAccountTypeUniqueForCustomer();
+            newCustomerValidatorService.hasCustomerFile(
+                    newPersonalAccountDto.getPersonalId(),
+                    newPersonalAccountDto.getFirstName(),
+                    newPersonalAccountDto.getLastName());
+        } catch (CustomerFileNotFoundException | WrongPersonalIdException customerFileNotFoundException) {
+            throw new CannotCreateAccountException("CANNOT_CREATE_ACCOUNT", customerFileNotFoundException);
         }
 
         accountNumber = accountService.createAndReturnAccountNumber(

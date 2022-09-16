@@ -2,7 +2,7 @@ package com.accounts.accountproject.controllers;
 
 import com.accounts.accountproject.models.NewPersonalAccountDto;
 import com.accounts.accountproject.models.PersonalAccountDto;
-import com.accounts.accountproject.services.CustomerFileNotFoundException;
+import com.accounts.accountproject.services.exceptions.CannotCreateAccountException;
 import com.accounts.accountproject.services.PersonalAccountService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -32,10 +32,10 @@ public class PersonalAccountController {
 
         try {
             createdAccountNumber = personalAccountService.createAndReturnAccountNumber(newPersonalAccountDto);
-        } catch (CustomerFileNotFoundException customerFileNotFoundException) {
+        } catch (CannotCreateAccountException cannotCreateAccountException) {
             return ResponseEntity
-                    .status(HttpStatus.NOT_FOUND)
-                    .body(customerFileNotFoundException.getMessage());
+                    .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                    .body(cannotCreateAccountException.getMessage());
         }
 
         return ResponseEntity
